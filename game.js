@@ -216,7 +216,15 @@ const game = {
   combo: 0,
   comboTimer: 0,
   nextBonus: 10000, // score threshold for the next extra life
+  phase: 0,         // global animation phase (legs, twinkle, muzzle)
+  muzzle: 0,
+  stars: [],        // static starfield positions
 };
+
+// Starfield: fixed decorative dots, generated once.
+for (let i = 0; i < 36; i++) {
+  game.stars.push({ x: Math.random() * W, y: Math.random() * H, b: 0.3 + Math.random() * 0.7, s: Math.random() * 1.6 + 0.4 });
+}
 
 function startGame() {
   game.state = STATE.PLAYING;
@@ -346,6 +354,7 @@ function tryFire() {
   const p = game.player;
   game.bullet = { x: p.x + p.w / 2 - 1.5, y: p.y - 4, w: 3, h: 10, vy: -BULLET_SPEED };
   fireCooldown = FIRE_COOLDOWN;
+  game.muzzle = 0.06;
 }
 function updateBullet(dt) {
   if (fireCooldown > 0) fireCooldown -= dt;
@@ -713,6 +722,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 function update(dt) {
+  game.phase += dt;
+  if (game.muzzle > 0) game.muzzle -= dt;
   if (game.state === STATE.PLAYING) {
     movePlayer(dt);
     updateBullet(dt);
@@ -760,6 +771,7 @@ function render() {
   ctx.fillStyle = "#1a1a2a";
   ctx.fillRect(0, PLAYER_TOP_ROW * CELL, W, 1);
 
+  drawStars();
   drawMushrooms();
   drawCentipede();
   drawSpider();
@@ -793,6 +805,15 @@ function render() {
   else if (game.state === STATE.PAUSED) drawPauseScreen();
 }
 
+function drawStars() {
+  for (const st of game.stars) {
+    const tw = 0.5 + 0.5 * Math.sin(game.phase * 2 + st.x); // twinkle
+    ctx.globalAlpha = st.b * (0.5 + 0.5 * tw);
+    ctx.fillStyle = "#556677";
+    ctx.fillRect(st.x, st.y, st.s, st.s);
+  }
+  ctx.globalAlpha = 1;
+}
 function drawMushrooms() {
   for (const m of game.mushrooms) {
     ctx.drawImage(mushroomSprite(m.hp, m.poison), m.x * CELL, m.y * CELL);
@@ -821,15 +842,18 @@ function mushroomSprite(hp, poison) {
 }
 
 function drawCentipede() {
+  const leg = (game.phase * 12) % 4 < 2 ? 0 : 2; // leg animation: two-frame wiggle
   for (const chain of game.centipedes) {
     for (let i = 0; i < chain.length; i++) {
       const s = chain[i];
       const isHead = i === 0;
       ctx.fillStyle = s.poison ? "#7df9ff" : (isHead ? "#39ff14" : "#22cc11");
       ctx.fillRect(s.x + 1, s.y + 2, CELL - 2, CELL - 4);
-      // legs
-      ctx.fillRect(s.x, s.y + 4, 2, 2);
-      ctx.fillRect(s.x + CELL - 2, s.y + 4, 2, 2);
+      // animated legs
+      ctx.fillRect(s.x, s.y + 4 + leg, 2, 2);
+      ctx.fillRect(s.x + CELL - 2, s.y + 4 - leg, 2, 2);
+      ctx.fillRect(s.x, s.y + CELL - 6 - leg, 2, 2);
+      ctx.fillRect(s.x + CELL - 2, s.y + CELL - 6 + leg, 2, 2);
       if (isHead) {
         // eyes
         ctx.fillStyle = "#000";
@@ -887,6 +911,11 @@ function drawPlayer() {
   // base
   ctx.fillStyle = "#ff7733";
   ctx.fillRect(p.x + 2, p.y + p.h - 4, p.w - 4, 3);
+  // muzzle flash on fire
+  if (game.muzzle > 0) {
+    ctx.fillStyle = "rgba(255,255,180," + Math.min(1, game.muzzle * 18) + ")";
+    ctx.fillRect(p.x + p.w / 2 - 3, p.y - 4, 6, 5);
+  }
 }
 
 function drawBullet() {
