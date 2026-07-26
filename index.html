@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Centipede</title>
+<style>
+  :root { --neon:#39ff14; --magenta:#ff2e88; --bg:#0a0a0f; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--neon);
+    font-family: "Courier New", monospace;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+    box-shadow: 0 0 24px rgba(57,255,20,0.25);
+    touch-action: none;
+  }
+  /* Touch controls overlay (only shown on touch devices) */
+  #touch {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    display: none;
+    pointer-events: none;
+    padding: 8px 12px env(safe-area-inset-bottom, 8px);
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .pad { display: flex; gap: 8px; pointer-events: none; }
+  .btn {
+    pointer-events: auto;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(57,255,20,0.12);
+    border: 2px solid rgba(57,255,20,0.55);
+    color: var(--neon);
+    font-size: 28px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  .btn:active { background: rgba(57,255,20,0.35); }
+  #fire { background: rgba(255,46,136,0.18); border-color: rgba(255,46,136,0.6); color: var(--magenta); }
+  body.touch #touch { display: flex; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="480" height="640"></canvas></div>
+<div id="touch">
+  <div class="pad">
+    <div class="btn" id="b-left">◀</div>
+    <div class="btn" id="b-right">▶</div>
+  </div>
+  <div class="pad">
+    <div class="btn" id="b-up">▲</div>
+    <div class="btn" id="b-down">▼</div>
+    <div class="btn" id="fire">⦿</div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
