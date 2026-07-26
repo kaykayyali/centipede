@@ -202,6 +202,7 @@ const game = {
   // combo pitch ladder for consecutive segment kills (resets on miss/long gap)
   combo: 0,
   comboTimer: 0,
+  nextBonus: 10000, // score threshold for the next extra life
 };
 
 function startGame() {
@@ -213,6 +214,7 @@ function startGame() {
   game.scorePops.length = 0;
   game.shake = 0; game.flash = 0;
   game.combo = 0; game.comboTimer = 0;
+  game.nextBonus = 10000;
   initLevel();
   spawnPlayer();
 }
@@ -648,6 +650,13 @@ function updateScorePops(dt) {
 }
 function addScore(n) {
   game.score += n;
+  // Bonus life every 10000 pts (classic). Cap lives so the HUD stays sane.
+  while (game.score >= game.nextBonus && game.lives < 8) {
+    game.lives++;
+    game.nextBonus += 10000;
+    SFX.life();
+    game.scorePops.push({ x: W / 2, y: 28, vy: -28, life: 1.4, n: "1UP", color: "#ff2e88" });
+  }
 }
 // addScore with a floating popup at screen coords (juice).
 function addScoreAt(n, x, y, color = "#ffffff") {
