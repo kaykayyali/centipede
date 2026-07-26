@@ -578,9 +578,16 @@ function updateSpider(dt) {
   if (game.player && game.player.invuln <= 0 && rectHit(s, game.player)) playerHit();
 }
 function hitSpider() {
-  const pts = 300 + Math.floor(Math.random() * 3) * 100;
-  addScoreAt(pts, game.spider.x + 9, game.spider.y, "#ff2e88");
-  spawnParticles(game.spider.x, game.spider.y, "#ff2e88", 14);
+  // Classic: the closer the spider is to the player when shot, the more points.
+  const s = game.spider;
+  let pts = 300;
+  if (game.player) {
+    const dy = Math.abs((s.y + s.h / 2) - (game.player.y + game.player.h / 2));
+    if (dy < CELL * 1.5) pts = 900;
+    else if (dy < CELL * 4) pts = 600;
+  }
+  addScoreAt(pts, s.x + 9, s.y, "#ff2e88");
+  spawnParticles(s.x, s.y, "#ff2e88", 14);
   SFX.killSeg();
   game.spider = null; game.shake = Math.min(game.shake + 4, 10);
 }
