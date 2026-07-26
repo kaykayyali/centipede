@@ -72,6 +72,7 @@ if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
 // Audio — synthesized via Web Audio API (no asset files)
 // ---------------------------------------------------------------------------
 let audioCtx = null;
+let muted = localStorage.getItem("centipede_muted") === "1";
 function audio() {
   if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -79,10 +80,15 @@ function audio() {
   }
   return audioCtx;
 }
+function toggleMute() {
+  muted = !muted;
+  localStorage.setItem("centipede_muted", muted ? "1" : "0");
+}
 // Resume on first interaction (autoplay policy).
 function ensureAudio() { const a = audio(); if (a && a.state === "suspended") a.resume(); }
 
 function blip(freq, dur, type = "square", gain = 0.08) {
+  if (muted) return;
   const a = audio();
   if (!a) return;
   const o = a.createOscillator();
@@ -97,6 +103,7 @@ function blip(freq, dur, type = "square", gain = 0.08) {
 }
 // blip with an upward frequency sweep — used for combo pitch-shifts.
 function sweep(f0, f1, dur, type = "square", gain = 0.07) {
+  if (muted) return;
   const a = audio(); if (!a) return;
   const o = a.createOscillator(), g = a.createGain();
   o.type = type;
@@ -108,6 +115,7 @@ function sweep(f0, f1, dur, type = "square", gain = 0.07) {
   o.start(); o.stop(a.currentTime + dur);
 }
 function noiseBurst(dur, gain = 0.12, filterFreq = 1200) {
+  if (muted) return;
   const a = audio();
   if (!a) return;
   const n = Math.floor(a.sampleRate * dur);
@@ -149,6 +157,7 @@ function setKey(code, val) {
     case "Space": keys.fire = val; if (val) firePressed = true; break;
     case "KeyP": if (val) togglePause(); break;
     case "Escape": if (val) togglePause(); break;
+    case "KeyM": if (val) toggleMute(); break;
   }
 }
 function togglePause() {
@@ -980,6 +989,10 @@ function drawHUD() {
   ctx.fillText("HIGH " + Math.max(game.high, game.score), W / 2, 6);
   ctx.textAlign = "right";
   ctx.fillText("LIVES " + game.lives + "  LV " + game.level, W - 8, 6);
+  if (muted) {
+    ctx.fillStyle = "#ff2e88";
+    ctx.fillText("MUTED (M)", W - 8, 22);
+  }
 }
 
 function centerText(text, y, size = 18, color = "#39ff14") {
@@ -996,7 +1009,7 @@ function drawStartScreen() {
   centerText("CENTIPEDE", H / 2 - 60, 36, "#39ff14");
   centerText("High Score  " + game.high, H / 2 - 26, 14, "#ffcc33");
   centerText("Arrow Keys / WASD to move", H / 2 - 6, 14, "#cfcfcf");
-  centerText("Space to fire   ·   P to pause", H / 2 + 16, 14, "#cfcfcf");
+  centerText("Space to fire   ·   P to pause   ·   M to mute", H / 2 + 16, 13, "#cfcfcf");
   centerText("Touch controls on mobile", H / 2 + 38, 12, "#8a8a8a");
   centerText("Press ENTER or TAP to start", H / 2 + 90, 16, "#ff2e88");
 }
