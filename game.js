@@ -30,7 +30,7 @@ const W = COLS * CELL;     // 480
 const H = ROWS * CELL;     // 640
 
 // Entity state machine values.
-const STATE = { START: 0, PLAYING: 1, GAMEOVER: 2, LEVELCLEAR: 3 };
+const STATE = { START: 0, PLAYING: 1, GAMEOVER: 2, LEVELCLEAR: 3, PAUSED: 4 };
 
 // ---------------------------------------------------------------------------
 // Canvas setup with crisp scaling
@@ -124,7 +124,13 @@ function setKey(code, val) {
     case "ArrowUp": case "KeyW": keys.up = val; break;
     case "ArrowDown": case "KeyS": keys.down = val; break;
     case "Space": keys.fire = val; if (val) firePressed = true; break;
+    case "KeyP": if (val) togglePause(); break;
+    case "Escape": if (val) togglePause(); break;
   }
+}
+function togglePause() {
+  if (game.state === STATE.PLAYING) game.state = STATE.PAUSED;
+  else if (game.state === STATE.PAUSED) game.state = STATE.PLAYING;
 }
 window.addEventListener("keydown", (e) => {
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(e.code)) e.preventDefault();
@@ -662,6 +668,8 @@ function update(dt) {
       initLevel();
       game.state = STATE.PLAYING;
     }
+  } else if (game.state === STATE.PAUSED) {
+    // Frozen: no updates, no timers.
   } else {
     updateParticles(dt);
   }
@@ -705,6 +713,7 @@ function render() {
   if (game.state === STATE.START) drawStartScreen();
   else if (game.state === STATE.GAMEOVER) drawGameOverScreen();
   else if (game.state === STATE.LEVELCLEAR) drawLevelClear();
+  else if (game.state === STATE.PAUSED) drawPauseScreen();
 }
 
 function drawMushrooms() {
@@ -840,7 +849,7 @@ function drawStartScreen() {
   ctx.fillRect(0, 0, W, H);
   centerText("CENTIPEDE", H / 2 - 60, 36, "#39ff14");
   centerText("Arrow Keys / WASD to move", H / 2 - 6, 14, "#cfcfcf");
-  centerText("Space to fire", H / 2 + 16, 14, "#cfcfcf");
+  centerText("Space to fire   ·   P to pause", H / 2 + 16, 14, "#cfcfcf");
   centerText("Touch controls on mobile", H / 2 + 38, 12, "#8a8a8a");
   centerText("Press ENTER or TAP to start", H / 2 + 90, 16, "#ff2e88");
 }
@@ -866,6 +875,12 @@ function drawLevelClear() {
   ctx.fillRect(0, 0, W, H);
   centerText("LEVEL " + game.level + " CLEARED", H / 2 - 10, 22, "#39ff14");
   centerText("Next wave incoming…", H / 2 + 18, 14, "#cfcfcf");
+}
+function drawPauseScreen() {
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(0, 0, W, H);
+  centerText("PAUSED", H / 2 - 14, 30, "#39ff14");
+  centerText("Press P or Esc to resume", H / 2 + 22, 13, "#cfcfcf");
 }
 
 let restartBtn = null;
