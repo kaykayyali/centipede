@@ -181,6 +181,8 @@ bindBtn("b-right", () => keys.right = true, () => keys.right = false);
 bindBtn("b-up",    () => keys.up = true,    () => keys.up = false);
 bindBtn("b-down",  () => keys.down = true,  () => keys.down = false);
 bindBtn("fire",    () => { keys.fire = true; firePressed = true; }, () => keys.fire = false);
+// Pause button fires togglePause on tap (edge-triggered inside togglePause via key? no — call directly).
+bindBtn("b-pause", () => togglePause(), () => {});
 
 function handleEnter() {
   if (game.state === STATE.START) startGame();

@@ -42,12 +42,15 @@
     background: rgba(57,255,20,0.12);
     border: 2px solid rgba(57,255,20,0.55);
     color: var(--neon);
-    font-size: 28px; font-weight: bold;
+    font-size: 26px; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
     user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
   }
   .btn:active { background: rgba(57,255,20,0.35); }
   #fire { background: rgba(255,46,136,0.18); border-color: rgba(255,46,136,0.6); color: var(--magenta); }
+  #b-pause { width: 48px; height: 48px; font-size: 20px; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4); color: #ddd; }
   body.touch #touch { display: flex; }
 </style>
 </head>
@@ -64,6 +67,7 @@
     <div class="btn" id="b-up">▲</div>
     <div class="btn" id="b-down">▼</div>
     <div class="btn" id="fire">⦿</div>
+    <div class="btn" id="b-pause">II</div>
   </div>
 </div>
 <script src="game.js"></script>
