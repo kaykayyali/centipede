@@ -968,6 +968,7 @@ function drawStartScreen() {
   ctx.fillStyle = "rgba(0,0,0,0.7)";
   ctx.fillRect(0, 0, W, H);
   centerText("CENTIPEDE", H / 2 - 60, 36, "#39ff14");
+  centerText("High Score  " + game.high, H / 2 - 26, 14, "#ffcc33");
   centerText("Arrow Keys / WASD to move", H / 2 - 6, 14, "#cfcfcf");
   centerText("Space to fire   ·   P to pause", H / 2 + 16, 14, "#cfcfcf");
   centerText("Touch controls on mobile", H / 2 + 38, 12, "#8a8a8a");
