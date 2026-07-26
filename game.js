@@ -447,11 +447,18 @@ function pickHeadTarget(h) {
   h.nx = tryX; h.ny = h.cy;
 }
 function verticalStep(h) {
+  // Once a centipede has entered the player band, it bounces within it
+  // (classic) rather than climbing back out into the open field.
+  const inBand = h.cy >= PLAYER_TOP_ROW;
   let ny = h.cy + h.dropDir;
-  if (ny >= ROWS) { h.dropDir = -1; ny = h.cy - 1; }
-  if (ny < 0) { h.dropDir = 1; ny = h.cy + 1; }
+  if (inBand) {
+    if (ny < PLAYER_TOP_ROW) { h.dropDir = 1; ny = h.cy + 1; }
+    if (ny >= ROWS) { h.dropDir = -1; ny = h.cy - 1; }
+  } else {
+    if (ny >= ROWS) { h.dropDir = -1; ny = h.cy - 1; }
+    if (ny < 0) { h.dropDir = 1; ny = h.cy + 1; }
+  }
   h.ny = ny;
-  // On entering the player band the centipede speeds up (handled in update via flag).
 }
 function updateCentipede(dt) {
   for (const chain of game.centipedes) {
@@ -598,10 +605,14 @@ function updateScorpion(dt) {
   if (!game.scorpion && scorpionTimer <= 0 && game.state === STATE.PLAYING && game.level >= 2) {
     // Scorpion appears more often at higher levels; crosses a mid-field row.
     scorpionTimer = Math.max(7, 14 - game.level) + Math.random() * 6;
+    // Choose a mid-field row that actually has mushrooms to poison.
+    const rowsWith = new Set();
+    for (const m of game.mushrooms)
+      if (m.y >= 4 && m.y < PLAYER_TOP_ROW - 1) rowsWith.add(m.y);
+    if (rowsWith.size === 0) return; // nothing to poison this wave
+    const rows = [...rowsWith];
+    const row = rows[Math.floor(Math.random() * rows.length)];
     const fromLeft = Math.random() < 0.5;
-    // Pick a row in the mid-field that actually has mushrooms to poison.
-    let row = (PLAYER_TOP_ROW - 8) + Math.floor(Math.random() * 6);
-    row = Math.max(4, Math.min(PLAYER_TOP_ROW - 2, row));
     game.scorpion = {
       x: fromLeft ? -CELL : W,
       y: row * CELL,
