@@ -356,77 +356,103 @@ function rectHit(a, b) {
 function segRect(s) { return { x: s.x, y: s.y, w: CELL, h: CELL }; }
 
 // Centipede -----------------------------------------------------------------
+// Grid-anchored snake movement: each segment occupies a cell and animates a
+// sub-cell `t` (0..1) toward its target cell. The head picks targets using
+// weave/drop/poison logic; each body segment targets the cell its predecessor
+// just vacated, so the whole chain trails one cell behind like a real snake.
+// `x`/`y` are derived pixels (kept for segRect/hit-cell compatibility).
 function spawnCentipede() {
   const len = Math.min(9 + game.level, 14);
-  const speed = 60 + game.level * 14;
   const chain = [];
   for (let i = 0; i < len; i++) {
     chain.push({
-      x: (COLS - 1 - i) * CELL,
-      y: 0,
-      dir: -1, // moving left initially from top-right
-      dropDir: 1, // drop down when blocked
-      isHead: i === 0,
+      cx: COLS - 1 + i, cy: 0,    // current cell (head at COLS-1; body files in from the right)
+      nx: COLS - 1 + i - 1, ny: 0, // target cell (each targets the cell ahead of it)
+      t: 0,
+      dir: -1,        // head's horizontal direction
+      dropDir: 1,     // +1 = drops downward when blocked, -1 = rises
       poison: false,
+      isHead: i === 0,
+      x: (COLS - 1 + i) * CELL, y: 0,
     });
   }
   game.centipedes.push(chain);
+}
+function centiBaseSpeed() { return 2.2 + game.level * 0.45; } // cells/sec
+function pickHeadTarget(h) {
+  // Poisoned head dives straight down through mushrooms until it bottoms out.
+  if (h.poison) {
+    if (h.cy + 1 >= ROWS) { h.poison = false; h.dropDir = -1; }
+    else { h.nx = h.cx; h.ny = h.cy + 1; return; }
+  }
+  const tryX = h.cx + h.dir;
+  // Wall: reverse and drop/rise.
+  if (tryX < 0 || tryX >= COLS) {
+    h.dir = -h.dir;
+    verticalStep(h);
+    h.nx = h.cx + h.dir; // step the other way next tick
+    return;
+  }
+  // Mushroom ahead: reverse and drop/rise.
+  if (getMushroom(tryX, h.cy)) {
+    h.dir = -h.dir;
+    verticalStep(h);
+    h.nx = h.cx + h.dir;
+    return;
+  }
+  h.nx = tryX; h.ny = h.cy;
+}
+function verticalStep(h) {
+  let ny = h.cy + h.dropDir;
+  if (ny >= ROWS) { h.dropDir = -1; ny = h.cy - 1; }
+  if (ny < 0) { h.dropDir = 1; ny = h.cy + 1; }
+  h.ny = ny;
+  // On entering the player band the centipede speeds up (handled in update via flag).
 }
 function updateCentipede(dt) {
   for (const chain of game.centipedes) {
     if (chain.length === 0) continue;
     const head = chain[0];
-    const speed = (head.poison ? 130 : 60 + game.level * 14) * (head.y >= PLAYER_TOP_ROW * CELL ? 1.25 : 1);
-    // Movement: head moves horizontally; body follows.
-    head.x += head.dir * speed * dt;
-    // Wall bounce
-    if (head.x < 0) { head.x = 0; dropChain(chain); }
-    else if (head.x > W - CELL) { head.x = W - CELL; dropChain(chain); }
-    // Mushroom bounce
-    const hx = Math.floor((head.x + CELL / 2) / CELL);
-    const hy = Math.floor((head.y + CELL / 2) / CELL);
-    const ahead = getMushroom(head.dir < 0 ? hx - 1 : hx + 1, hy);
-    if (ahead) { dropChain(chain); }
-    // Body trail: each segment follows previous segment's position with offset.
-    for (let i = 1; i < chain.length; i++) {
-      const prev = chain[i - 1], cur = chain[i];
-      const dx = prev.x - cur.x, dy = prev.y - cur.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > CELL) {
-        const move = dist - CELL;
-        cur.x += (dx / dist) * move;
-        cur.y += (dy / dist) * move;
+    const inBand = head.cy >= PLAYER_TOP_ROW;
+    const speed = (head.poison ? 4.5 : centiBaseSpeed()) * (inBand ? 1.3 : 1);
+    const rate = speed * dt; // cells of progress this frame
+    // Capture each segment's old cell as it commits, to feed the next segment.
+    let prevOld = null;
+    let prevCommitted = false;
+    for (let i = 0; i < chain.length; i++) {
+      const s = chain[i];
+      s.t += rate;
+      // Derive pixel position from current→target interpolation.
+      s.x = (s.cx + (s.nx - s.cx) * Math.min(1, s.t)) * CELL;
+      s.y = (s.cy + (s.ny - s.cy) * Math.min(1, s.t)) * CELL;
+      if (s.t >= 1) {
+        const old = { cx: s.cx, cy: s.cy };
+        s.cx = s.nx; s.cy = s.ny;
+        s.t -= 1;
+        if (i === 0) {
+          // Head: pick its own next target; detect poison mushrooms under it.
+          if (getMushroom(s.cx, s.cy) && getMushroom(s.cx, s.cy).poison) s.poison = true;
+          pickHeadTarget(s);
+        } else {
+          // Body: target the cell the predecessor just vacated (if available).
+          if (prevCommitted && prevOld) { s.nx = prevOld.cx; s.ny = prevOld.cy; }
+        }
+        prevOld = old;
+        prevCommitted = true;
       }
+      // If this segment didn't commit, its old cell isn't fresh for the next.
+      // (prevCommitted only set on commit; reset for the next sibling below.)
     }
-    // Touch player?
-    if (game.player && rectHit(segRect(head), game.player) && game.player.invuln <= 0) {
-      playerHit();
+    // Player collision with any segment.
+    if (game.player && game.player.invuln <= 0) {
+      for (const s of chain) if (rectHit(segRect(s), game.player)) { playerHit(); break; }
     }
   }
-  // Remove empty chains.
   game.centipedes = game.centipedes.filter(c => c.length > 0);
-  // Level clear?
   if (game.centipedes.length === 0 && game.state === STATE.PLAYING) {
     game.state = STATE.LEVELCLEAR;
     game.levelClearTimer = 1.6;
     SFX.level();
-  }
-}
-function dropChain(chain) {
-  const head = chain[0];
-  head.dir = -head.dir;
-  // Drop a row. In player band, centipede still drops but reverses; classic.
-  const ny = head.y + CELL;
-  if (ny > H - CELL) {
-    // Wrap back to top (re-enter) — classic centipede reappears at top as new head.
-    head.y = 0;
-  } else {
-    head.y = ny;
-  }
-  // Body snaps behind head.
-  for (let i = 1; i < chain.length; i++) {
-    chain[i].x = head.x + i * CELL * head.dir;
-    chain[i].y = head.y;
   }
 }
 
