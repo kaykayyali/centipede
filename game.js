@@ -29,6 +29,17 @@ const PLAYER_TOP_ROW = ROWS - PLAYER_BAND_ROWS; // first row the player may ente
 const W = COLS * CELL;     // 480
 const H = ROWS * CELL;     // 640
 
+// Reduced-motion: honor the OS setting by dampening shake/flash/particles.
+const REDUCED = window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sr = document.getElementById("sr-status");
+function announceStatus() {
+  if (!sr) return;
+  const names = { 0: "Start screen", 1: "Playing", 2: "Game over", 3: "Level cleared", 4: "Paused" };
+  sr.textContent = `${names[game.state] || ""}. Score ${game.score}. Lives ${game.lives}. Wave ${game.level}.`;
+}
+let lastAnnouncedState = -1;
+
 // Entity state machine values.
 const STATE = { START: 0, PLAYING: 1, GAMEOVER: 2, LEVELCLEAR: 3, PAUSED: 4 };
 
@@ -634,6 +645,7 @@ function playerHit() {
 
 // Particles & score pops ---------------------------------------------------
 function spawnParticles(x, y, color, n) {
+  if (REDUCED) n = Math.ceil(n / 3);
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
     const sp = 30 + Math.random() * 90;
@@ -724,8 +736,8 @@ function update(dt) {
 // ---------------------------------------------------------------------------
 function render() {
   ctx.save();
-  // Screen shake.
-  if (game.shake > 0) {
+  // Screen shake (suppressed under reduced-motion).
+  if (game.shake > 0 && !REDUCED) {
     ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
   }
   ctx.fillStyle = "#000";
@@ -746,14 +758,21 @@ function render() {
   drawScorePops();
   ctx.restore();
 
-  // Flash overlay.
-  if (game.flash > 0) {
+  // Flash overlay (suppressed under reduced-motion).
+  if (game.flash > 0 && !REDUCED) {
     ctx.fillStyle = `rgba(255,80,80,${game.flash})`;
     ctx.fillRect(0, 0, W, H);
   }
 
   drawHUD();
   if (game.state === STATE.PLAYING && game.waveBannerTimer > 0) drawWaveBanner();
+
+  // Mirror state to the screen-reader live region (throttled to state changes
+  // + occasional score bumps so it isn't chatty every frame).
+  if (game.state !== lastAnnouncedState) {
+    lastAnnouncedState = game.state;
+    announceStatus();
+  }
 
   if (game.state === STATE.START) drawStartScreen();
   else if (game.state === STATE.GAMEOVER) drawGameOverScreen();

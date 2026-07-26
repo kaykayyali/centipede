@@ -52,7 +52,9 @@
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="game" width="480" height="640"></canvas></div>
+<div id="wrap"><canvas id="game" width="480" height="640" role="img" aria-label="Centipede arcade game" tabindex="0"></canvas></div>
+<!-- Accessible live status for screen readers; mirrored from the HUD. -->
+<div id="sr-status" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Centipede. Press Enter to start.</div>
 <div id="touch">
   <div class="pad">
     <div class="btn" id="b-left">◀</div>
