@@ -186,6 +186,10 @@ const game = {
   shake: 0,
   flash: 0,
   levelClearTimer: 0,
+  waveBannerTimer: 0,
+  // combo pitch ladder for consecutive segment kills (resets on miss/long gap)
+  combo: 0,
+  comboTimer: 0,
 };
 
 function startGame() {
@@ -209,16 +213,21 @@ function initLevel() {
   game.centipedes = [];
 
   // Reset / seed mushrooms. On level >1 keep damage from previous field
-  // (classic behaviour) — but ensure density target.
+  // (classic behaviour) — but ensure density target, and clear poison so a
+  // fresh wave doesn't inherit a poisoned field from the last scorpion.
   if (game.level === 1) {
     game.mushrooms = [];
     game.mushroomMap.clear();
     seedMushrooms(40);
   } else {
-    // Top up to a target density so the field doesn't thin to nothing.
+    for (const m of game.mushrooms) m.poison = false;
     topUpMushrooms(40);
   }
 
+  // Reset auxiliary-enemy timers so a new wave doesn't immediately dump a spider.
+  spiderTimer = 4 + Math.random() * 2;
+  scorpionTimer = 10 + Math.random() * 6;
+  game.waveBannerTimer = 1.1;
   spawnCentipede();
 }
 
@@ -384,7 +393,7 @@ function spawnCentipede() {
   }
   game.centipedes.push(chain);
 }
-function centiBaseSpeed() { return 2.2 + game.level * 0.45; } // cells/sec
+function centiBaseSpeed() { return Math.min(2.2 + game.level * 0.4, 6); } // cells/sec, capped
 function pickHeadTarget(h) {
   // Poisoned head dives straight down through mushrooms until it bottoms out.
   if (h.poison) {
@@ -467,15 +476,16 @@ let spiderTimer = 0;
 function updateSpider(dt) {
   spiderTimer -= dt;
   if (!game.spider && spiderTimer <= 0) {
-    spiderTimer = 5 + Math.random() * 4;
+    // Spider pressure ramps with level (min 2.2s gap), and gets faster.
+    spiderTimer = Math.max(2.2, 5.5 - game.level * 0.25) + Math.random() * 2.5;
     if (game.state === STATE.PLAYING) {
       const fromLeft = Math.random() < 0.5;
       game.spider = {
         x: fromLeft ? -CELL : W,
         y: (PLAYER_TOP_ROW + 2 + Math.random() * 4) * CELL,
         w: 18, h: 18,
-        vx: (fromLeft ? 1 : -1) * (60 + Math.random() * 40),
-        vy: (Math.random() < 0.5 ? 1 : -1) * 80,
+        vx: (fromLeft ? 1 : -1) * (60 + game.level * 4 + Math.random() * 40),
+        vy: (Math.random() < 0.5 ? 1 : -1) * (80 + game.level * 4),
         zig: 0,
       };
     }
@@ -511,17 +521,19 @@ function hitSpider() {
 
 // Flea ---------------------------------------------------------------------
 function updateFlea(dt) {
-  // Spawn a flea when the bottom 6 rows have few mushrooms.
+  // Spawn a flea when the player band has few mushrooms. Spawn rate rises with level.
   if (!game.flea && game.state === STATE.PLAYING) {
     let lowCount = 0;
-    for (const m of game.mushrooms) if (m.y > PLAYER_TOP_ROW - 2) lowCount++;
-    if (lowCount < 5 && Math.random() < 0.02) {
+    for (const m of game.mushrooms) if (m.y >= PLAYER_TOP_ROW - 2) lowCount++;
+    const p = Math.min(0.06, 0.018 + game.level * 0.004);
+    if (lowCount < 5 && Math.random() < p) {
       game.flea = {
         x: (Math.random() * (COLS - 2) + 1) * CELL,
         y: -CELL,
         w: 12, h: 14,
-        vy: 200,
+        vy: 190 + game.level * 8,
         dropTimer: 0,
+        hp: undefined,
       };
     }
   }
@@ -555,13 +567,17 @@ let scorpionTimer = 0;
 function updateScorpion(dt) {
   scorpionTimer -= dt;
   if (!game.scorpion && scorpionTimer <= 0 && game.state === STATE.PLAYING && game.level >= 2) {
-    scorpionTimer = 12 + Math.random() * 8;
+    // Scorpion appears more often at higher levels; crosses a mid-field row.
+    scorpionTimer = Math.max(7, 14 - game.level) + Math.random() * 6;
     const fromLeft = Math.random() < 0.5;
+    // Pick a row in the mid-field that actually has mushrooms to poison.
+    let row = (PLAYER_TOP_ROW - 8) + Math.floor(Math.random() * 6);
+    row = Math.max(4, Math.min(PLAYER_TOP_ROW - 2, row));
     game.scorpion = {
       x: fromLeft ? -CELL : W,
-      y: (PLAYER_TOP_ROW - 4) * CELL,
+      y: row * CELL,
       w: 20, h: 12,
-      vx: (fromLeft ? 1 : -1) * 90,
+      vx: (fromLeft ? 1 : -1) * (90 + game.level * 4),
     };
   }
   const s = game.scorpion; if (!s) return;
@@ -656,6 +672,7 @@ function update(dt) {
     updateScorpion(dt);
     updateParticles(dt);
     updateScorePops(dt);
+    if (game.waveBannerTimer > 0) game.waveBannerTimer -= dt;
     // Decay poison over level? keep.
     if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 20);
     if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 2);
@@ -709,6 +726,7 @@ function render() {
   }
 
   drawHUD();
+  if (game.state === STATE.PLAYING && game.waveBannerTimer > 0) drawWaveBanner();
 
   if (game.state === STATE.START) drawStartScreen();
   else if (game.state === STATE.GAMEOVER) drawGameOverScreen();
@@ -881,6 +899,12 @@ function drawPauseScreen() {
   ctx.fillRect(0, 0, W, H);
   centerText("PAUSED", H / 2 - 14, 30, "#39ff14");
   centerText("Press P or Esc to resume", H / 2 + 22, 13, "#cfcfcf");
+}
+function drawWaveBanner() {
+  const a = Math.min(1, game.waveBannerTimer * 1.4);
+  ctx.globalAlpha = a;
+  centerText("WAVE " + game.level, H * 0.28, 26, "#39ff14");
+  ctx.globalAlpha = 1;
 }
 
 let restartBtn = null;
