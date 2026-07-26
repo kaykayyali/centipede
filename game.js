@@ -162,6 +162,16 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Enter") handleEnter();
 });
 window.addEventListener("keyup", (e) => setKey(e.code, false));
+// Auto-pause if the tab loses focus while playing (so the game doesn't run
+// unattended and the dt clamp doesn't have to carry a long gap).
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && game.state === STATE.PLAYING) game.state = STATE.PAUSED;
+});
+window.addEventListener("blur", () => {
+  if (game.state === STATE.PLAYING) game.state = STATE.PAUSED;
+});
+// Clear stuck keys on blur so the player doesn't drift after refocusing.
+window.addEventListener("blur", () => { keys.left = keys.right = keys.up = keys.down = keys.fire = false; });
 
 // Touch buttons
 function bindBtn(id, on, off) {
