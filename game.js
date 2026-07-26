@@ -795,15 +795,29 @@ function render() {
 
 function drawMushrooms() {
   for (const m of game.mushrooms) {
-    const x = m.x * CELL, y = m.y * CELL;
-    const c = m.poison ? "#7df9ff" : ["#3b2a6b","#5a3f9c","#7a4fb0","#a070d0"][Math.min(3, 4 - m.hp)];
-    ctx.fillStyle = c;
-    // mushroom cap + stem dots
-    ctx.fillRect(x + 2, y + 3, CELL - 4, CELL / 2 - 2);
-    ctx.fillRect(x + 5, y + CELL / 2, CELL - 10, CELL / 3);
-    ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.fillRect(x + 4, y + 5, 3, 3);
+    ctx.drawImage(mushroomSprite(m.hp, m.poison), m.x * CELL, m.y * CELL);
   }
+}
+// Pre-rendered mushroom sprites keyed by `${hp}-${poison}` so each mushroom
+// is one drawImage instead of 3 fillRects (the mushroom field is the most
+// numerous thing on screen, so this is where batching pays off).
+const mushSprites = new Map();
+function mushroomSprite(hp, poison) {
+  hp = Math.max(1, Math.min(4, hp));
+  const key = hp + "-" + (poison ? 1 : 0);
+  let s = mushSprites.get(key);
+  if (s) return s;
+  s = document.createElement("canvas");
+  s.width = CELL; s.height = CELL;
+  const g = s.getContext("2d");
+  const c = poison ? "#7df9ff" : ["#3b2a6b", "#5a3f9c", "#7a4fb0", "#a070d0"][4 - hp];
+  g.fillStyle = c;
+  g.fillRect(2, 3, CELL - 4, CELL / 2 - 2);
+  g.fillRect(5, CELL / 2, CELL - 10, CELL / 3);
+  g.fillStyle = "rgba(255,255,255,0.25)";
+  g.fillRect(4, 5, 3, 3);
+  mushSprites.set(key, s);
+  return s;
 }
 
 function drawCentipede() {
