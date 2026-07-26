@@ -84,6 +84,18 @@ function blip(freq, dur, type = "square", gain = 0.08) {
   o.start();
   o.stop(a.currentTime + dur);
 }
+// blip with an upward frequency sweep — used for combo pitch-shifts.
+function sweep(f0, f1, dur, type = "square", gain = 0.07) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, a.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(40, f1), a.currentTime + dur);
+  g.gain.setValueAtTime(gain, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+  o.connect(g).connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur);
+}
 function noiseBurst(dur, gain = 0.12, filterFreq = 1200) {
   const a = audio();
   if (!a) return;
@@ -101,7 +113,7 @@ const SFX = {
   shoot:    () => blip(880, 0.08, "square", 0.05),
   hitMush:  () => blip(220, 0.06, "square", 0.06),
   hitSeg:   () => { blip(440, 0.05); noiseBurst(0.08, 0.08, 2000); },
-  killSeg:  () => { blip(660, 0.06); blip(330, 0.12, "sawtooth", 0.07); },
+  killSeg:  (pitch = 1) => { blip(660 * pitch, 0.06); blip(330 * pitch, 0.12, "sawtooth", 0.07); },
   spider:   () => blip(140, 0.05, "sawtooth", 0.04),
   flea:     () => blip(1100, 0.04, "square", 0.04),
   scorpion: () => blip(180, 0.1, "sawtooth", 0.05),
@@ -200,6 +212,7 @@ function startGame() {
   game.particles.length = 0;
   game.scorePops.length = 0;
   game.shake = 0; game.flash = 0;
+  game.combo = 0; game.comboTimer = 0;
   initLevel();
   spawnPlayer();
 }
@@ -341,7 +354,10 @@ function updateBullet(dt) {
         addMushroom(cx, cy, false);
         chain.splice(i, 1);
         addScoreAt(10, s.x + CELL / 2, s.y + CELL / 2, "#39ff14");
-        SFX.killSeg();
+        // Combo: each consecutive segment kill within the window pitches up.
+        game.combo = Math.min(game.combo + 1, 12);
+        game.comboTimer = 1.2;
+        SFX.killSeg(1 + game.combo * 0.07);
         spawnParticles(s.x + CELL / 2, s.y + CELL / 2, "#39ff14", 10);
         game.shake = Math.min(game.shake + 3, 8);
         // Classic split: the front keeps going; everything past the break
@@ -673,6 +689,8 @@ function update(dt) {
     updateParticles(dt);
     updateScorePops(dt);
     if (game.waveBannerTimer > 0) game.waveBannerTimer -= dt;
+    // Combo decays back to 0 if you stop killing segments.
+    if (game.comboTimer > 0) { game.comboTimer -= dt; if (game.comboTimer <= 0) game.combo = 0; }
     // Decay poison over level? keep.
     if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 20);
     if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 2);
