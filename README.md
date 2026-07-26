@@ -31,9 +31,14 @@ to start. Survive waves, score points, beat your high score.
 |---|---|---|
 | Move | Arrow keys or WASD | On-screen D-pad |
 | Fire | Space (hold for auto-fire) | ⦿ button |
+| Pause | P or Esc | II button |
+| Mute | M | — (M key) |
 
 The player moves freely within the bottom band of the screen and is blocked by
-mushrooms. Firing is rate-limited; one dart on screen at a time.
+mushrooms. Firing is rate-limited; one dart on screen at a time. Scoring:
+mushroom 1, centipede segment 10 (+ combo pitch), flea 10/50, spider
+300/600/900 (closer to the blaster = more), scorpion 1000. Extra life every
+10000 points. High score persists across sessions; mute preference too.
 
 ## Architecture
 
@@ -46,26 +51,39 @@ Key design points:
   an accumulator; rendering runs every rAF. Movement is frame-rate independent
   and a tab-switch clamp (`dt > 0.25`) prevents spiral-of-death.
 - **State machine.** `START → PLAYING → (LEVELCLEAR → PLAYING)* → GAMEOVER →
-  PLAYING` (restart). `startGame()` reinitializes every entity array, so no
-  listeners, timers, or centipedes leak across runs. There is exactly one
-  `requestAnimationFrame` loop for the lifetime of the page.
-- **Sparse mushroom grid.** Mushrooms live in an array keyed by cell; a cell
-  lookup is a linear scan over the field (small N, fine for now).
-- **Centipede as chain of segments.** Each chain has a head that drives
-  horizontal motion and row-drops on wall/mushroom contact; the body trails the
-  head. Shooting a non-head segment splits the trailing portion into a new
-  independent chain with its own head — the core Centipede mechanic.
+  PLAYING` (restart), plus `PAUSED`. `startGame()` reinitializes every entity
+  array and timer, so no listeners, timers, or centipedes leak across runs.
+  There is exactly one `requestAnimationFrame` loop for the page lifetime; the
+  auto-pause-on-blur prevents unattended play.
+- **Mushroom field.** Mushrooms live in an array plus a `Map` keyed `"x,y"` for
+  O(1) cell lookups (kept in sync on add/delete), which matters because the
+  centipede weave, player collision, and bullet hits all probe cells every
+  frame. Damage states are pre-rendered to cached 16×16 sprites and blitted
+  with one `drawImage` per mushroom.
+- **Grid-anchored centipede.** Each segment occupies a cell and animates a
+  sub-cell `t ∈ [0,1)` toward a target cell. The head picks weave/drop/poison
+  targets; each body segment targets the cell its predecessor just vacated, so
+  the chain trails one cell behind like a real snake. Shooting a non-head
+  segment splits the trailing portion into a new independent chain with its
+  own head — the core Centipede mechanic. A centipede that enters the player
+  band bounces within it; a poisoned head dives straight down. Late waves
+  (L5, L9) spawn additional centipedes.
 - **Axis-separated player movement.** The player tries X then Y each frame so
   it slides along mushroom walls instead of sticking.
-- **Audio.** `blip()` (oscillator) and `noiseBurst()` (filtered noise buffer)
-  synthesize every SFX on demand; the AudioContext resumes on first input to
-  satisfy autoplay policies.
-- **Scaling.** The internal resolution is fixed at 480×640; CSS scales the
-  canvas to the viewport with `image-rendering: pixelated` for crisp pixels.
+- **Audio.** `blip()` (oscillator), `sweep()` (gliding oscillator), and
+  `noiseBurst()` (filtered noise buffer) synthesize every SFX on demand — no
+  audio asset files. Combo pitch-shifts consecutive segment kills; the
+  AudioContext resumes on first input to satisfy autoplay policies; `M` mutes
+  and persists.
+- **Scaling & a11y.** Internal resolution fixed at 480×640; CSS scales the
+  canvas to the viewport with `image-rendering: pixelated` plus a CRT scanline
+  overlay. `prefers-reduced-motion` suppresses shake/flash and cuts particles;
+  an `aria-live` region announces state/score/wave for screen readers.
 
-A headless smoke test (`smoke.js`, not committed — needs `puppeteer-core`) loads
-the page, verifies the start→play transition, and exercises a full
-death→restart cycle to confirm no leaked second rAF loop and clean state reset.
+A headless smoke test (`smoke.js`, not committed — needs `puppeteer-core`)
+loads the page, verifies the start→play transition, exercises a full
+death→restart cycle to confirm no leaked second rAF loop and a clean state
+reset, and checks frame count stays ~60.
 
 ## Running the test
 
