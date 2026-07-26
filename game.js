@@ -167,7 +167,8 @@ const game = {
   high: parseInt(localStorage.getItem("centipede_high") || "0", 10),
   lives: 3,
   level: 1,
-  mushrooms: [],         // sparse grid: map "x,y" -> {x,y,hp,poison}
+  mushrooms: [],         // array of {x,y,hp,poison}
+  mushroomMap: new Map(), // "x,y" -> same object, for O(1) cell lookup
   player: null,
   bullet: null,
   centipedes: [],         // array of chains; each chain = array of segments
@@ -205,6 +206,7 @@ function initLevel() {
   // (classic behaviour) — but ensure density target.
   if (game.level === 1) {
     game.mushrooms = [];
+    game.mushroomMap.clear();
     seedMushrooms(40);
   } else {
     // Top up to a target density so the field doesn't thin to nothing.
@@ -216,16 +218,14 @@ function initLevel() {
 
 // Mushrooms -----------------------------------------------------------------
 function mkey(x, y) { return x + "," + y; }
-function getMushroom(x, y) {
-  for (const m of game.mushrooms) if (m.x === x && m.y === y) return m;
-  return null;
-}
+function getMushroom(x, y) { return game.mushroomMap.get(mkey(x, y)) || null; }
 function addMushroom(x, y, poison = false) {
   if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return null;
-  if (getMushroom(x, y)) return null;
-  // Don't plant inside player band too densely near spawn.
+  const k = mkey(x, y);
+  if (game.mushroomMap.has(k)) return null;
   const m = { x, y, hp: 4, poison };
   game.mushrooms.push(m);
+  game.mushroomMap.set(k, m);
   return m;
 }
 function seedMushrooms(target) {
@@ -245,8 +245,8 @@ function damageMushroom(m) {
   m.hp--;
   SFX.hitMush();
   if (m.hp <= 0) {
-    const idx = game.mushrooms.indexOf(m);
-    if (idx >= 0) game.mushrooms.splice(idx, 1);
+    game.mushrooms.splice(game.mushrooms.indexOf(m), 1);
+    game.mushroomMap.delete(mkey(m.x, m.y));
     addScore(1);
     spawnParticles(m.x * CELL + CELL / 2, m.y * CELL + CELL / 2, "#7a4fb0", 6);
   }
@@ -489,7 +489,8 @@ function updateSpider(dt) {
   const sx = Math.floor((s.x + s.w / 2) / CELL), sy = Math.floor((s.y + s.h / 2) / CELL);
   const m = getMushroom(sx, sy);
   if (m) {
-    const idx = game.mushrooms.indexOf(m); if (idx >= 0) game.mushrooms.splice(idx, 1);
+    game.mushrooms.splice(game.mushrooms.indexOf(m), 1);
+    game.mushroomMap.delete(mkey(sx, sy));
   }
   if (s.x < -CELL * 2 || s.x > W + CELL) game.spider = null;
   if (game.player && game.player.invuln <= 0 && rectHit(s, game.player)) playerHit();
