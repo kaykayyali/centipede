@@ -247,7 +247,7 @@ function damageMushroom(m) {
   if (m.hp <= 0) {
     game.mushrooms.splice(game.mushrooms.indexOf(m), 1);
     game.mushroomMap.delete(mkey(m.x, m.y));
-    addScore(1);
+    addScoreAt(1, m.x * CELL + CELL / 2, m.y * CELL + CELL / 2, "#a070d0");
     spawnParticles(m.x * CELL + CELL / 2, m.y * CELL + CELL / 2, "#7a4fb0", 6);
   }
 }
@@ -325,7 +325,7 @@ function updateBullet(dt) {
         const cy = Math.floor((s.y + CELL / 2) / CELL);
         addMushroom(cx, cy, false);
         chain.splice(i, 1);
-        addScore(10);
+        addScoreAt(10, s.x + CELL / 2, s.y + CELL / 2, "#39ff14");
         SFX.killSeg();
         spawnParticles(s.x + CELL / 2, s.y + CELL / 2, "#39ff14", 10);
         game.shake = Math.min(game.shake + 3, 8);
@@ -496,7 +496,8 @@ function updateSpider(dt) {
   if (game.player && game.player.invuln <= 0 && rectHit(s, game.player)) playerHit();
 }
 function hitSpider() {
-  addScore(300 + Math.floor(Math.random() * 3) * 100);
+  const pts = 300 + Math.floor(Math.random() * 3) * 100;
+  addScoreAt(pts, game.spider.x + 9, game.spider.y, "#ff2e88");
   spawnParticles(game.spider.x, game.spider.y, "#ff2e88", 14);
   SFX.killSeg();
   game.spider = null; game.shake = Math.min(game.shake + 4, 10);
@@ -534,9 +535,12 @@ function updateFlea(dt) {
 function hitFlea() {
   // Two hits to kill; speed up after first.
   if (!game.flea) return;
-  if (game.flea.hp === undefined) { game.flea.hp = 2; game.flea.vy *= 1.5; addScore(50); SFX.hitSeg(); }
-  else {
-    addScore(50); spawnParticles(game.flea.x, game.flea.y, "#88ddff", 10); SFX.killSeg(); game.flea = null;
+  if (game.flea.hp === undefined) {
+    game.flea.hp = 2; game.flea.vy *= 1.5;
+    addScoreAt(10, game.flea.x + 6, game.flea.y, "#88ddff"); SFX.hitSeg();
+  } else {
+    addScoreAt(50, game.flea.x + 6, game.flea.y, "#88ddff");
+    spawnParticles(game.flea.x, game.flea.y, "#88ddff", 10); SFX.killSeg(); game.flea = null;
   }
 }
 
@@ -565,7 +569,8 @@ function updateScorpion(dt) {
   if (game.player && game.player.invuln <= 0 && rectHit(s, game.player)) playerHit();
 }
 function hitScorpion() {
-  addScore(1000); spawnParticles(game.scorpion.x, game.scorpion.y, "#ffd24a", 14);
+  addScoreAt(1000, game.scorpion.x + 10, game.scorpion.y, "#ffd24a");
+  spawnParticles(game.scorpion.x, game.scorpion.y, "#ffd24a", 14);
   SFX.killSeg(); game.scorpion = null; game.shake = Math.min(game.shake + 4, 10);
 }
 
@@ -599,9 +604,17 @@ function updateParticles(dt) {
   for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120 * dt; p.life -= dt; }
   game.particles = game.particles.filter(p => p.life > 0);
 }
+function updateScorePops(dt) {
+  for (const s of game.scorePops) { s.y += s.vy * dt; s.vy *= (1 - dt * 1.5); s.life -= dt; }
+  game.scorePops = game.scorePops.filter(s => s.life > 0);
+}
 function addScore(n) {
   game.score += n;
-  if (game.score > game.high) { /* live high not persisted until death */ }
+}
+// addScore with a floating popup at screen coords (juice).
+function addScoreAt(n, x, y, color = "#ffffff") {
+  addScore(n);
+  game.scorePops.push({ x, y, vy: -34, life: 0.9, n, color });
 }
 
 // ---------------------------------------------------------------------------
@@ -636,11 +649,13 @@ function update(dt) {
     updateFlea(dt);
     updateScorpion(dt);
     updateParticles(dt);
+    updateScorePops(dt);
     // Decay poison over level? keep.
     if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 20);
     if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 2);
   } else if (game.state === STATE.LEVELCLEAR) {
     updateParticles(dt);
+    updateScorePops(dt);
     game.levelClearTimer -= dt;
     if (game.levelClearTimer <= 0) {
       game.level++;
@@ -676,6 +691,7 @@ function render() {
   drawPlayer();
   drawBullet();
   drawParticles();
+  drawScorePops();
   ctx.restore();
 
   // Flash overlay.
@@ -784,6 +800,17 @@ function drawParticles() {
     ctx.fillStyle = p.color;
     ctx.globalAlpha = Math.max(0, p.life * 2);
     ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawScorePops() {
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 13px 'Courier New', monospace";
+  for (const s of game.scorePops) {
+    ctx.globalAlpha = Math.min(1, s.life * 1.6);
+    ctx.fillStyle = s.color;
+    ctx.fillText("" + s.n, s.x, s.y);
   }
   ctx.globalAlpha = 1;
 }
