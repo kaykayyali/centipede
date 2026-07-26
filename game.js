@@ -265,6 +265,10 @@ function initLevel() {
   scorpionTimer = 10 + Math.random() * 6;
   game.waveBannerTimer = 1.1;
   spawnCentipede();
+  // Late-game escalation: a second centipede enters from the opposite side
+  // at L5+, a third at L9+. Shorter, on a different row, for real pressure.
+  if (game.level >= 5) spawnCentipede({ len: 6 + Math.min(4, game.level - 5), row: 2, fromLeft: true });
+  if (game.level >= 9) spawnCentipede({ len: 6, row: 4, fromLeft: false });
 }
 
 // Mushrooms -----------------------------------------------------------------
@@ -416,19 +420,24 @@ function segRect(s) { return { x: s.x, y: s.y, w: CELL, h: CELL }; }
 // weave/drop/poison logic; each body segment targets the cell its predecessor
 // just vacated, so the whole chain trails one cell behind like a real snake.
 // `x`/`y` are derived pixels (kept for segRect/hit-cell compatibility).
-function spawnCentipede() {
-  const len = Math.min(9 + game.level, 14);
+function spawnCentipede(opts = {}) {
+  const len = opts.len || Math.min(9 + game.level, 14);
+  const row = opts.row || 0;
+  const fromLeft = !!opts.fromLeft;     // default: enter from the right, moving left
+  const headCell = fromLeft ? 0 : COLS - 1;
+  const dir = fromLeft ? 1 : -1;
   const chain = [];
   for (let i = 0; i < len; i++) {
+    const off = fromLeft ? -i : i;        // body trails behind the head's direction of motion
     chain.push({
-      cx: COLS - 1 + i, cy: 0,    // current cell (head at COLS-1; body files in from the right)
-      nx: COLS - 1 + i - 1, ny: 0, // target cell (each targets the cell ahead of it)
+      cx: headCell + off, cy: row,
+      nx: headCell + off + dir, ny: row,
       t: 0,
-      dir: -1,        // head's horizontal direction
-      dropDir: 1,     // +1 = drops downward when blocked, -1 = rises
+      dir,
+      dropDir: 1,
       poison: false,
       isHead: i === 0,
-      x: (COLS - 1 + i) * CELL, y: 0,
+      x: (headCell + off) * CELL, y: row * CELL,
     });
   }
   game.centipedes.push(chain);
